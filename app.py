@@ -5,7 +5,7 @@ st.set_page_config(
     page_title="ExamBridge AI | GATE Analyzer",
     page_icon="🎓",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
 import pdfplumber
@@ -38,7 +38,7 @@ from googleapiclient.discovery import build
 PDF_FOLDER = "gate_pdfs"
 # Check for secrets (Hugging Face / Streamlit Cloud) or environment variables
 YOUTUBE_API_KEY = st.secrets.get("YOUTUBE_API_KEY") or os.getenv("YOUTUBE_API_KEY") or "AIzaSyAsJzyUy_IaAglkSUBYVXZUjxH1ehLG8b0"
-DEPLOYMENT_MODE = True  # True = hide views & likes
+DEPLOYMENT_MODE = False  # False = Dev Mode (show views & likes)
 
 # Custom CSS for a professional look
 st.markdown("""
@@ -334,16 +334,22 @@ with input_col:
 
 with extra_col:
     st.subheader("🎯 Target GATE")
-    if os.path.exists(PDF_FOLDER):
-        branches = [
-            file.replace(".pdf", "")
-            for file in os.listdir(PDF_FOLDER)
-            if file.endswith(".pdf")
-        ]
-    else:
-        branches = []
+    st.subheader("🎯 Target GATE")
+    # Check both PDF_FOLDER and root directory for flexibility
+    potential_paths = [PDF_FOLDER, "."]
+    branches = []
     
-    selected_branch = st.selectbox("Select GATE Branch:", branches)
+    for path in potential_paths:
+        if os.path.exists(path):
+            branches.extend([
+                file.replace(".pdf", "")
+                for file in os.listdir(path)
+                if file.endswith(".pdf")
+            ])
+    
+    # Remove duplicates if any
+    branches = list(set(branches))
+    selected_branch = st.selectbox("Select GATE Branch:", sorted(branches))
     
     st.info("💡 **Pro Tip:** Pasting text is often faster for quick checks!")
 
@@ -359,10 +365,13 @@ if st.button("🚀 Run Semantic Analysis"):
     elif not selected_branch:
         st.warning("Please select a target GATE branch.")
     else:
+        # Check for syllabus in both folder and root
         gate_pdf_path = os.path.join(PDF_FOLDER, f"{selected_branch}.pdf")
-        
         if not os.path.exists(gate_pdf_path):
-            st.error("GATE syllabus file not found.")
+            gate_pdf_path = f"{selected_branch}.pdf" # Try root
+            
+        if not os.path.exists(gate_pdf_path):
+            st.error(f"GATE syllabus file '{selected_branch}.pdf' not found in {PDF_FOLDER} or root.")
         else:
             with st.spinner("🔬 Performing Deep Semantic Analysis..."):
                 # Load GATE Syllabus
