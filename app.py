@@ -4,25 +4,7 @@ import os
 import re
 import sys
 
-# ===============================
-# ENVIRONMENT GUARD (Fix for 3.14 DLL Error)
-# ===============================
-if sys.version_info >= (3, 13):
-    st.error("### ⚠️ Unsupported Python Version Detected")
-    st.markdown(f"""
-    **Current version:** {sys.version.split()[0]} (Unstable/Pre-release)
-    
-    The libraries used in this project (Sentence Transformers, PyArrow) do not yet support Python 3.13 or 3.14. This causes the **'DLL load failed'** error you are seeing.
-    
-    **How to fix:**
-    1. Close this tab.
-    2. Open your terminal in VS Code.
-    3. Run the app using the stable environment I created for you:
-       ```powershell
-       .\\venv\\Scripts\\python.exe -m streamlit run app.py
-       ```
-    """)
-    st.stop()
+# Environment Guard Removed as requested to allow deployment on Render's Python environment
 
 from sentence_transformers import SentenceTransformer, util
 from googleapiclient.discovery import build
