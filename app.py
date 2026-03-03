@@ -38,10 +38,25 @@ from googleapiclient.discovery import build
 
 PDF_FOLDER = "gate_pdfs"
 # Check for secrets securely
-try:
-    YOUTUBE_API_KEY = st.secrets["YOUTUBE_API_KEY"]
-except Exception:
-    YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY") or "AIzaSyAsJzyUy_IaAglkSUBYVXZUjxH1ehLG8b0"
+# On Hugging Face, 'Secrets' are stored as environment variables.
+# We check these FIRST to avoid Streamlit's secrets.toml FileNotFoundError.
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
+
+if not YOUTUBE_API_KEY:
+    # Extremely defensive check for st.secrets to avoid FileNotFoundError crash
+    secrets_paths = [
+        os.path.join(os.path.expanduser("~"), ".streamlit", "secrets.toml"),
+        os.path.join(os.getcwd(), ".streamlit", "secrets.toml")
+    ]
+    if any(os.path.exists(p) for p in secrets_paths):
+        try:
+            YOUTUBE_API_KEY = st.secrets.get("YOUTUBE_API_KEY")
+        except Exception:
+            pass
+
+# Final fallback to hardcoded key if all else fails
+if not YOUTUBE_API_KEY:
+    YOUTUBE_API_KEY = "AIzaSyAsJzyUy_IaAglkSUBYVXZUjxH1ehLG8b0"
 DEPLOYMENT_MODE = False  # False = Dev Mode (show views & likes)
 
 # Custom CSS for a professional look
