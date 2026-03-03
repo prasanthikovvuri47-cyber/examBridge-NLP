@@ -1,0 +1,86 @@
+{
+  "Engineering Mathematics": [
+    "Linear Algebra",
+    "Calculus",
+    "Differential Equations",
+    "Complex Variables",
+    "Probability and Statistics",
+    "Numerical Methods",
+    "Transform Theory"
+  ],
+  "Electrical Engineering Core Subjects": {
+    "Electric Circuits and Fields": [
+      "Network graph",
+      "KCL, KVL",
+      "Node and mesh analysis",
+      "Transient response",
+      "Sinusoidal steady state",
+      "Two-port networks",
+      "Electrostatics",
+      "Magnetostatics",
+      "Maxwell’s equations"
+    ],
+    "Signals and Systems": [
+      "Continuous-time and discrete-time signals",
+      "Fourier series",
+      "Fourier transform",
+      "Laplace transform",
+      "Z-transform",
+      "Sampling theorem",
+      "Convolution",
+      "Correlation"
+    ],
+    "Electrical Machines": [
+      "Transformers",
+      "DC machines",
+      "Induction machines",
+      "Synchronous machines",
+      "Equivalent circuits",
+      "Performance analysis"
+    ],
+    "Power Systems": [
+      "Power generation concepts",
+      "Transmission line parameters",
+      "Performance of transmission lines",
+      "Corona and insulators",
+      "Fault analysis",
+      "Load flow analysis",
+      "Stability analysis",
+      "Protection systems"
+    ],
+    "Control Systems": [
+      "Feedback principles",
+      "Transfer functions",
+      "Block diagrams",
+      "Stability criteria",
+      "Root locus",
+      "Bode plots",
+      "Nyquist criterion",
+      "State-space analysis"
+    ],
+    "Electrical and Electronic Measurements": [
+      "Error analysis",
+      "Measurement of voltage, current, power, energy",
+      "Instrument transformers",
+      "Oscilloscopes",
+      "Bridges and transducers"
+    ],
+    "Analog and Digital Electronics": [
+      "Diodes and transistors",
+      "Operational amplifiers",
+      "Combinational circuits",
+      "Sequential circuits",
+      "Logic families",
+      "Number systems"
+    ],
+    "Power Electronics": [
+      "Diode rectifiers",
+      "Thyristors",
+      "MOSFETs and IGBTs",
+      "DC-DC converters",
+      "Inverters",
+      "AC voltage controllers",
+      "Applications in drives and power systems"
+    ]
+  }
+}

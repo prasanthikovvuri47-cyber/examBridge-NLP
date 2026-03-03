@@ -1,0 +1,34 @@
+{
+  "Engineering Mathematics": [
+    "Linear Algebra",
+    "Calculus",
+    "Differential Equations",
+    "Complex Variables",
+    "Probability and Statistics",
+    "Numerical Methods"
+  ],
+  "Mechanical Engineering Core Subjects": {
+    "Applied Mechanics and Design": [
+      "Engineering Mechanics",
+      "Strength of Materials",
+      "Theory of Machines",
+      "Machine Design"
+    ],
+    "Fluid Mechanics and Thermal Sciences": [
+      "Fluid Mechanics",
+      "Heat Transfer",
+      "Thermodynamics",
+      "Applications (Power plants, IC engines, Refrigeration and Air-conditioning)"
+    ],
+    "Materials, Manufacturing and Industrial Engineering": [
+      "Engineering Materials",
+      "Casting, Forming and Joining Processes",
+      "Machining and Machine Tool Operations",
+      "Metrology and Inspection",
+      "Computer Integrated Manufacturing",
+      "Production Planning and Control",
+      "Inventory Control",
+      "Operations Research"
+    ]
+  }
+}

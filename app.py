@@ -1,16 +1,35 @@
 import streamlit as st
+
+# MUST BE THE FIRST ST-COMMAND
+st.set_page_config(
+    page_title="ExamBridge AI | GATE Analyzer",
+    page_icon="🎓",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
+
 import pdfplumber
 import os
 import re
 import sys
-
-# Environment Guard Removed as requested to allow deployment on Render's Python environment
-
-from sentence_transformers import SentenceTransformer, util
-from googleapiclient.discovery import build
 import numpy as np
 import requests
 import tempfile
+
+# Environment Guard Removed as requested to allow deployment on Render's Python environment
+
+# Lazy load heavy modules
+@st.cache_resource
+def get_transformer_modules():
+    from sentence_transformers import SentenceTransformer, util
+    return SentenceTransformer, util
+
+@st.cache_resource
+def get_model():
+    SentenceTransformer, _ = get_transformer_modules()
+    return SentenceTransformer('all-MiniLM-L6-v2')
+
+from googleapiclient.discovery import build
 
 # ===============================
 # CONFIGURATION
@@ -19,13 +38,6 @@ import tempfile
 PDF_FOLDER = "gate_pdfs"
 YOUTUBE_API_KEY = "AIzaSyAsJzyUy_IaAglkSUBYVXZUjxH1ehLG8b0"   # Add your API key here
 DEPLOYMENT_MODE = True  # True = hide views & likes
-
-st.set_page_config(
-    page_title="ExamBridge AI | GATE Analyzer",
-    page_icon="🎓",
-    layout="wide",
-    initial_sidebar_state="collapsed"
-)
 
 # Custom CSS for a professional look
 st.markdown("""
@@ -111,20 +123,12 @@ with col2:
 
 st.divider()
 
-# ===============================
-# LOAD SEMANTIC MODEL
-# ===============================
-
-@st.cache_resource
-def load_model():
-    return SentenceTransformer('all-MiniLM-L6-v2')
-
-model = load_model()
+# Model loading handled lazily in analysis section
 
 try:
     youtube = build('youtube', 'v3', developerKey=YOUTUBE_API_KEY)
 except Exception as e:
-    st.error(f"YouTube API Error: {e}")
+    st.warning(f"YouTube API Error: {e}")
     youtube = None
 
 # ===============================
@@ -156,6 +160,8 @@ def extract_topics(text):
 def compute_overall_similarity(college_text, gate_text):
     if not college_text or not gate_text:
         return 0.0
+    _, util = get_transformer_modules()
+    model = get_model()
     embeddings = model.encode([college_text, gate_text])
     similarity = util.cos_sim(embeddings[0], embeddings[1])
     return float(similarity) * 100
@@ -165,6 +171,8 @@ def topic_wise_similarity(college_topics, gate_topics):
     if not college_topics or not gate_topics:
         return []
 
+    _, util = get_transformer_modules()
+    model = get_model()
     college_embeddings = model.encode(college_topics, convert_to_tensor=True)
     gate_embeddings = model.encode(gate_topics, convert_to_tensor=True)
 
@@ -402,7 +410,7 @@ if st.button("🚀 Run Semantic Analysis"):
                 st.write("Recommended lectures for High Priority gaps:")
                 
                 # Filter results explicitly for strings containing "High"
-                high_priority_results = [r for r in results if isinstance(r.get("priority"), str) and "High" in r["priority"]]
+                high_priority_results = [r for r in results if isinstance(r.get("priority"), str) and "High" in str(r.get("priority"))]
                 
                 if not high_priority_results:
                     st.success("Great job! Your syllabus covers the GATE topics well.")

@@ -1,0 +1,83 @@
+{
+  "Engineering Mathematics": [
+    "Discrete Mathematics",
+    "Linear Algebra",
+    "Calculus",
+    "Probability",
+    "Statistics",
+    "Numerical Methods"
+  ],
+  "Computer Science Core Subjects": {
+    "Digital Logic": [
+      "Boolean algebra",
+      "Combinational circuits",
+      "Sequential circuits",
+      "Number representations",
+      "Minimization"
+    ],
+    "Computer Organization and Architecture": [
+      "Machine instructions",
+      "Addressing modes",
+      "ALU, data-path and control unit",
+      "Instruction pipelining",
+      "Memory hierarchy",
+      "Cache and virtual memory"
+    ],
+    "Programming and Data Structures": [
+      "C programming concepts",
+      "Recursion",
+      "Arrays, stacks, queues, linked lists",
+      "Trees",
+      "Graphs"
+    ],
+    "Algorithms": [
+      "Searching and sorting",
+      "Divide and conquer",
+      "Greedy algorithms",
+      "Dynamic programming",
+      "Graph algorithms",
+      "NP-completeness"
+    ],
+    "Theory of Computation": [
+      "Regular languages and finite automata",
+      "Context-free languages and pushdown automata",
+      "Turing machines",
+      "Decidability"
+    ],
+    "Compiler Design": [
+      "Lexical analysis",
+      "Parsing",
+      "Syntax-directed translation",
+      "Runtime environments",
+      "Intermediate code generation"
+    ],
+    "Operating Systems": [
+      "Processes, threads",
+      "CPU scheduling",
+      "Memory management",
+      "File systems",
+      "Deadlocks"
+    ],
+    "Databases": [
+      "ER model",
+      "Relational model",
+      "SQL",
+      "Normalization",
+      "Transactions and concurrency control"
+    ],
+    "Computer Networks": [
+      "OSI and TCP/IP models",
+      "LAN technologies",
+      "Flow and error control",
+      "Routing algorithms",
+      "Congestion control",
+      "Application layer protocols (HTTP, FTP, SMTP)"
+    },
+    "Software Engineering": [
+      "Software development life cycle",
+      "Agile methods",
+      "Testing",
+      "Project management"
+    }
+  }
+}

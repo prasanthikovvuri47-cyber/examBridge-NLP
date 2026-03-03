@@ -1,0 +1,62 @@
+{
+  "Engineering Mathematics": [
+    "Linear Algebra",
+    "Calculus",
+    "Probability and Statistics",
+    "Numerical Methods"
+  ],
+  "Core Data Science and Artificial Intelligence": {
+    "Programming, Data Structures and Algorithms": [
+      "C programming concepts",
+      "Arrays, stacks, queues, linked lists",
+      "Trees",
+      "Graphs",
+      "Searching and sorting",
+      "Divide and conquer",
+      "Greedy algorithms",
+      "Dynamic programming",
+      "Graph algorithms",
+      "NP-completeness"
+    ],
+    "Machine Learning": [
+      "Supervised learning",
+      "Unsupervised learning",
+      "Reinforcement learning",
+      "Classification and regression",
+      "Decision trees",
+      "Neural networks",
+      "Support vector machines",
+      "Clustering methods",
+      "Dimensionality reduction"
+    ],
+    "Probability and Statistics": [
+      "Permutations and combinations",
+      "Probability axioms",
+      "Conditional probability",
+      "Bayes theorem",
+      "Expectation and variance",
+      "Correlation and covariance",
+      "Random variables",
+      "Discrete distributions (Bernoulli, Binomial, Poisson)",
+      "Continuous distributions (Uniform, Normal, Exponential, t, Chi-squared)",
+      "Central limit theorem",
+      "Confidence intervals",
+      "Hypothesis testing (z-test, t-test, chi-squared test)"
+    ],
+    "Data Science Foundations": [
+      "Data preprocessing",
+      "Feature engineering",
+      "Model evaluation",
+      "Cross-validation",
+      "Bias-variance tradeoff"
+    ],
+    "Artificial Intelligence": [
+      "Search algorithms",
+      "Knowledge representation",
+      "Logic and reasoning",
+      "Planning",
+      "Markov decision processes",
+      "Game theory basics"
+    ]
+  }
+}

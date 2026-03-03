@@ -1,0 +1,42 @@
+{
+  "Engineering Mathematics": [
+    "Linear Algebra",
+    "Calculus",
+    "Ordinary Differential Equations",
+    "Partial Differential Equations",
+    "Probability and Statistics",
+    "Numerical Methods"
+  ],
+  "Civil Engineering Core Subjects": {
+    "Structural Engineering": [
+      "Engineering Mechanics",
+      "Structural Analysis",
+      "Concrete Structures",
+      "Steel Structures"
+    ],
+    "Geotechnical Engineering": [
+      "Soil Mechanics",
+      "Foundation Engineering"
+    ],
+    "Water Resources Engineering": [
+      "Fluid Mechanics",
+      "Hydraulics",
+      "Hydrology",
+      "Irrigation"
+    ],
+    "Environmental Engineering": [
+      "Water and Wastewater",
+      "Air Pollution",
+      "Solid Waste Management"
+    ],
+    "Transportation Engineering": [
+      "Highway Planning",
+      "Traffic Engineering",
+      "Pavement Design"
+    ],
+    "Geomatics Engineering": [
+      "Surveying",
+      "Geographic Information Systems (GIS)"
+    ]
+  }
+}

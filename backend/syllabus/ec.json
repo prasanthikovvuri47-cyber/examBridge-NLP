@@ -1,0 +1,69 @@
+{
+  "Engineering Mathematics": [
+    "Linear Algebra",
+    "Calculus",
+    "Differential Equations",
+    "Complex Variables",
+    "Probability and Statistics",
+    "Numerical Methods",
+    "Vector Analysis"
+  ],
+  "Electronics and Communication Core Subjects": {
+    "Networks, Signals and Systems": [
+      "Network graphs",
+      "Node and mesh analysis",
+      "Transient response",
+      "Sinusoidal steady state",
+      "Fourier series and transforms",
+      "Laplace transform",
+      "Z-transform",
+      "Sampling theorem"
+    ],
+    "Electronic Devices": [
+      "Semiconductor physics",
+      "Diodes",
+      "BJTs",
+      "MOSFETs",
+      "Device characteristics",
+      "Small signal models"
+    ],
+    "Analog Circuits": [
+      "Operational amplifiers",
+      "Feedback amplifiers",
+      "Oscillators",
+      "Power amplifiers",
+      "Filters"
+    ],
+    "Digital Circuits": [
+      "Boolean algebra",
+      "Combinational circuits",
+      "Sequential circuits",
+      "Number systems",
+      "Minimization"
+    ],
+    "Control Systems": [
+      "Feedback principles",
+      "Transfer functions",
+      "Block diagrams",
+      "Stability analysis",
+      "Root locus",
+      "Bode plots",
+      "Nyquist criterion"
+    ],
+    "Communications": [
+      "Analog communications",
+      "Digital communications",
+      "Information theory",
+      "Error detection and correction",
+      "Modulation techniques"
+    ],
+    "Electromagnetics": [
+      "Electrostatics",
+      "Magnetostatics",
+      "Maxwell’s equations",
+      "Transmission lines",
+      "Waveguides",
+      "Antennas"
+    }
+  }
+}
