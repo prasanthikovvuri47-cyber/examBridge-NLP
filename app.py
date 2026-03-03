@@ -15,6 +15,7 @@ import sys
 import numpy as np
 import requests
 import tempfile
+from youtube_transcript_api import YouTubeTranscriptApi
 
 # Environment Guard Removed as requested to allow deployment on Render's Python environment
 
@@ -36,8 +37,11 @@ from googleapiclient.discovery import build
 # ===============================
 
 PDF_FOLDER = "gate_pdfs"
-# Check for secrets (Hugging Face / Streamlit Cloud) or environment variables
-YOUTUBE_API_KEY = st.secrets.get("YOUTUBE_API_KEY") or os.getenv("YOUTUBE_API_KEY") or "AIzaSyAsJzyUy_IaAglkSUBYVXZUjxH1ehLG8b0"
+# Check for secrets securely
+try:
+    YOUTUBE_API_KEY = st.secrets["YOUTUBE_API_KEY"]
+except Exception:
+    YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY") or "AIzaSyAsJzyUy_IaAglkSUBYVXZUjxH1ehLG8b0"
 DEPLOYMENT_MODE = False  # False = Dev Mode (show views & likes)
 
 # Custom CSS for a professional look
@@ -106,6 +110,21 @@ st.markdown("""
     .video-meta {
         font-size: 0.8rem;
         color: #666;
+    }
+    .summary-card {
+        background-color: #fff5f5;
+        border-radius: 8px;
+        padding: 10px;
+        margin-top: 10px;
+        border-left: 3px solid #FF4B4B;
+        font-size: 0.85rem;
+        color: #444;
+    }
+    .summary-title {
+        font-weight: bold;
+        color: #FF4B4B;
+        margin-bottom: 5px;
+        font-size: 0.9rem;
     }
     h1, h2, h3 {
         color: #1E1E1E;
@@ -294,6 +313,43 @@ def get_best_video_link(topic):
         return None
 
 
+def get_video_summary(video_id, topic):
+    """
+    Generates a memory-efficient extractive summary by ranking transcript sentences 
+    relative to the target topic.
+    """
+    try:
+        transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
+        full_text = " ".join([t['text'] for t in transcript_list])
+        
+        # Split into sentences (simple split for speed/memory)
+        sentences = [s.strip() for s in re.split(r'[.!?]\s+', full_text) if len(s.strip()) > 20]
+        
+        if not sentences:
+            return "Transcript available but no substantial content found for summary."
+
+        # Get models
+        _, util = get_transformer_modules()
+        model = get_model()
+        
+        # Encode topic and sentences
+        topic_emb = model.encode(topic, convert_to_tensor=True)
+        sentence_embs = model.encode(sentences, convert_to_tensor=True)
+        
+        # Compute similarities
+        similarities = util.cos_sim(topic_emb, sentence_embs)[0]
+        
+        # Get top 3 most relevant sentences
+        top_indices = similarities.argsort(descending=True)[:3]
+        top_sentences = [sentences[idx] for idx in top_indices.tolist()]
+        
+        # Format summary
+        summary = " • " + "\n • ".join(top_sentences)
+        return summary
+    except Exception:
+        return "Summary not available (transcripts might be disabled for this video)."
+
+
 # ===============================
 # USER INTERFACE - INPUTS
 # ===============================
@@ -443,6 +499,13 @@ if st.button("🚀 Run Semantic Analysis"):
                                 </div>
                                 """, unsafe_allow_html=True)
                                 st.video(video_data['url'])
+                                
+                                # Fetch and show summary
+                                with st.expander("📝 Key Lecture Points (AI Summary)"):
+                                    v_id = video_data['url'].split("v=")[-1]
+                                    with st.spinner("Summarizing lecture..."):
+                                        summary = get_video_summary(v_id, topic_name)
+                                        st.markdown(f'<div class="summary-card"><div class="summary-title">Relevant Highlights:</div>{summary}</div>', unsafe_allow_html=True)
                         else:
                             with st.expander(f"📌 {topic_name}"):
                                 st.write("Searching for lectures...")
