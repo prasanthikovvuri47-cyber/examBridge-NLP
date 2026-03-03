@@ -36,7 +36,8 @@ from googleapiclient.discovery import build
 # ===============================
 
 PDF_FOLDER = "gate_pdfs"
-YOUTUBE_API_KEY = "AIzaSyAsJzyUy_IaAglkSUBYVXZUjxH1ehLG8b0"   # Add your API key here
+# Check for secrets (Hugging Face / Streamlit Cloud) or environment variables
+YOUTUBE_API_KEY = st.secrets.get("YOUTUBE_API_KEY") or os.getenv("YOUTUBE_API_KEY") or "AIzaSyAsJzyUy_IaAglkSUBYVXZUjxH1ehLG8b0"
 DEPLOYMENT_MODE = True  # True = hide views & likes
 
 # Custom CSS for a professional look
