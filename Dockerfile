@@ -20,5 +20,5 @@ COPY . .
 # Hugging Face Spaces runs on port 7860
 EXPOSE 7860
 
-# Command to run Streamlit on the correct port and address for Hugging Face
-CMD ["streamlit", "run", "app.py", "--server.port", "7860", "--server.address", "0.0.0.0"]
+# Command to run FastAPI
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "7860"]

@@ -29,28 +29,59 @@ def extract_text_from_pdf(contents: bytes) -> str:
         print(f"Error extracting PDF: {e}")
     return text
 
-def calculate_similarity(text1: str, text2: str) -> float:
+def extract_topics(text):
+    if not text:
+        return []
+    # Clean text and split by newlines
+    lines = text.split("\n")
+    # Filter lines that look like topics (length check + no page numbers)
+    topics = [line.strip() for line in lines if 10 < len(line.strip()) < 150 and not re.search(r'page \d+', line, re.I)]
+    # Deduplicate while preserving order
+    return list(dict.fromkeys(topics))
+
+def compute_overall_similarity(text1, text2):
     model = get_model()
     util = get_util()
     embeddings = model.encode([text1, text2])
     similarity = util.cos_sim(embeddings[0], embeddings[1])
-    return float(similarity[0][0])
+    return float(similarity[0][0]) * 100
 
-def analyze_text_against_syllabus(text: str, syllabus_data: dict):
-    results = {}
-    
-    for subject, topics in syllabus_data.items():
-        subject_scores = {}
+def topic_wise_similarity_ranking(college_topics, gate_topics):
+    if not college_topics or not gate_topics:
+        return []
         
-        for topic_name, subtopics in topics.items():
-            combined_topic_text = f"{topic_name}: " + " ".join(subtopics)
-            score = calculate_similarity(text, combined_topic_text)
-            subject_scores[topic_name] = round(score * 100, 1) # Convert to percentage
-
-        sorted_scores = dict(
-            sorted(subject_scores.items(), key=lambda x: x[1], reverse=True)
-        )
-
-        results[subject] = sorted_scores
-
+    model = get_model()
+    util = get_util()
+    
+    # Batch encode for performance
+    college_embeddings = model.encode(college_topics, convert_to_tensor=True)
+    gate_embeddings = model.encode(gate_topics, convert_to_tensor=True)
+    
+    # Compute similarity matrix
+    similarity_matrix = util.cos_sim(gate_embeddings, college_embeddings)
+    
+    results = []
+    for i, gate_topic in enumerate(gate_topics):
+        # Find best match in college syllabus
+        best_index = similarity_matrix[i].argmax()
+        best_score = float(similarity_matrix[i][best_index]) * 100
+        matched_topic = college_topics[best_index]
+        
+        # Priority logic
+        if best_score < 40:
+            priority = "🚨 High"
+        elif 40 <= best_score < 70:
+            priority = "🟡 Medium"
+        else:
+            priority = "✅ Low"
+            
+        results.append({
+            "gate_topic": gate_topic,
+            "matched_topic": matched_topic,
+            "similarity": round(best_score, 1),
+            "priority": priority
+        })
+        
+    # Sort by priority and then similarity (Critical gaps first)
+    results.sort(key=lambda x: (x["priority"] != "🚨 High", x["priority"] != "🟡 Medium", x["similarity"]))
     return results

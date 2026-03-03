@@ -39,20 +39,16 @@ from googleapiclient.discovery import build
 PDF_FOLDER = "gate_pdfs"
 # Check for secrets securely
 # On Hugging Face, 'Secrets' are stored as environment variables.
-# We check these FIRST to avoid Streamlit's secrets.toml FileNotFoundError.
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 
+# Fallback for local testing if env var is missing
 if not YOUTUBE_API_KEY:
-    # Extremely defensive check for st.secrets to avoid FileNotFoundError crash
-    secrets_paths = [
-        os.path.join(os.path.expanduser("~"), ".streamlit", "secrets.toml"),
-        os.path.join(os.getcwd(), ".streamlit", "secrets.toml")
-    ]
-    if any(os.path.exists(p) for p in secrets_paths):
-        try:
+    try:
+        # We only access st.secrets if we think it might exist to avoid visual warnings on some platforms
+        if os.path.exists(".streamlit/secrets.toml") or os.path.exists(os.path.expanduser("~/.streamlit/secrets.toml")):
             YOUTUBE_API_KEY = st.secrets.get("YOUTUBE_API_KEY")
-        except Exception:
-            pass
+    except Exception:
+        pass
 
 # Final fallback to hardcoded key if all else fails
 if not YOUTUBE_API_KEY:
@@ -404,7 +400,6 @@ with input_col:
                 st.error(f"Failed to fetch PDF: {e}")
 
 with extra_col:
-    st.subheader("🎯 Target GATE")
     st.subheader("🎯 Target GATE")
     # Check both PDF_FOLDER and root directory for flexibility
     potential_paths = [PDF_FOLDER, "."]

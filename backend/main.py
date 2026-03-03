@@ -1,22 +1,20 @@
-from backend.routes.auth import router as auth_router
-from fastapi import FastAPI, UploadFile, File, HTTPException, Body
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from backend.services.nlp_service import extract_text_from_pdf, analyze_text_against_syllabus
-from backend.services.youtube_service import fetch_youtube_videos
-from backend.utils.syllabus_loader import load_syllabus
+from backend.services.nlp_service import extract_text_from_pdf, extract_topics, compute_overall_similarity, topic_wise_similarity_ranking, get_model, get_util
+from backend.services.youtube_service import fetch_youtube_videos, get_video_summary
 import os
 import uvicorn
 
-app = FastAPI(title="ExamBridge Nexus Backend")
+app = FastAPI(title="ExamBridge AI API")
 
 # -------------------------------
-# CORS CONFIG
+# CORS CONFIG - Allow your GitHub Pages site
 # -------------------------------
 origins = [
     "https://pothulaannapurna8.github.io",
     "http://localhost:3000",
-    "http://127.0.0.1:5500"
+    "http://127.0.0.1:5500",
+    "*" # Allowed for debugging, narrow down in production
 ]
 
 app.add_middleware(
@@ -27,186 +25,76 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# -------------------------------
-# ROUTERS
-# -------------------------------
-app.include_router(auth_router)
+PDF_FOLDER = "gate_pdfs"
 
-# -------------------------------
-# TEMP STORAGE (Upgrade to DB later)
-# -------------------------------
-analysis_cache = {}
-user_progress = {}
-
-# -------------------------------
-# ROOT
-# -------------------------------
 @app.get("/")
 def home():
-    return {
-        "message": "ExamBridge Nexus Backend Running 🚀",
-        "status": "healthy"
-    }
+    return {"status": "ExamBridge AI API is Running 🚀"}
 
-# -------------------------------
-# ANALYZE PDF
-# -------------------------------
 @app.post("/analyze/{branch}")
-async def analyze_pdf(branch: str, file: UploadFile = File(...)):
-    branch = branch.lower()
+async def analyze(branch: str, file: UploadFile = File(...)):
+    """
+    Main endpoint for the GitHub frontend.
+    1. Extracts text from uploaded PDF.
+    2. Compares against the specified GATE branch PDF.
+    3. Returns similarity score, gaps, and summarized YouTube lectures.
+    """
+    # 1. Extract College Syllabus Text
+    content = await file.read()
+    college_text = extract_text_from_pdf(content)
+    
+    if not college_text.strip():
+        raise HTTPException(status_code=400, detail="Could not extract text from PDF")
 
-    syllabus_data = load_syllabus(branch)
-    if syllabus_data is None:
-        raise HTTPException(status_code=400, detail="Branch not supported")
+    # 2. Load GATE Syllabus
+    gate_pdf_path = os.path.join(PDF_FOLDER, f"{branch}.pdf")
+    if not os.path.exists(gate_pdf_path):
+        # Try root as fallback
+        gate_pdf_path = f"{branch}.pdf"
+        
+    if not os.path.exists(gate_pdf_path):
+        raise HTTPException(status_code=404, detail=f"GATE branch {branch} not found")
+        
+    with open(gate_pdf_path, "rb") as f:
+        gate_content = f.read()
+        gate_text = extract_text_from_pdf(gate_content)
 
-    contents = await file.read()
-    # Handle both bytes and strings if needed (nlp_service expects bytes for extraction)
-    text = extract_text_from_pdf(contents)
+    # 3. Perform AI Analysis
+    overall_similarity = compute_overall_similarity(college_text, gate_text)
+    college_topics = extract_topics(college_text)
+    gate_topics = extract_topics(gate_text)
+    results = topic_wise_similarity_ranking(college_topics, gate_topics)
 
-    if not text.strip():
-        raise HTTPException(status_code=400, detail="Could not extract text")
+    # 4. Get Enriched Recommendations (Gaps + Summaries)
+    high_priority_gaps = [r for r in results if "High" in r["priority"]][:8]
+    recommendations = []
+    
+    model = get_model()
+    util = get_util()
 
-    results = analyze_text_against_syllabus(text, syllabus_data)
-
-    analysis_cache[branch] = results
-
-    return {
-        "success": True,
-        "branch": branch,
-        "analysis": results
-    }
-
-# -------------------------------
-# DASHBOARD (Chart.js Friendly)
-# -------------------------------
-@app.get("/dashboard/{branch}")
-def get_dashboard(branch: str):
-    branch = branch.lower()
-
-    if branch not in analysis_cache:
-        raise HTTPException(status_code=404, detail="No analysis found")
-
-    analysis = analysis_cache[branch]
-
-    subjects = []
-    scores = []
-
-    for subject, topics in analysis.items():
-        avg_score = sum(topics.values()) / len(topics)
-        subjects.append(subject)
-        scores.append(round(avg_score, 2))
-
-    return {
-        "success": True,
-        "labels": subjects,
-        "data": scores
-    }
-
-# -------------------------------
-# PRIORITY TOPICS
-# -------------------------------
-@app.get("/priority/{branch}")
-def get_priority(branch: str, top_n: int = 5):
-    branch = branch.lower()
-
-    if branch not in analysis_cache:
-        raise HTTPException(status_code=404, detail="No analysis found")
-
-    analysis = analysis_cache[branch]
-
-    all_scores = []
-
-    for subject, topics in analysis.items():
-        for topic, score in topics.items():
-            all_scores.append((subject, topic, score))
-
-    ranked = sorted(all_scores, key=lambda x: x[2], reverse=True)
-    top_topics = ranked[:top_n]
-
-    enriched_topics = []
-
-    for subject, topic, score in top_topics:
-        videos = fetch_youtube_videos(f"GATE {topic} lecture")
-
-        enriched_topics.append({
-            "subject": subject,
-            "topic": topic,
-            "score": score,
-            "videos": videos
-        })
-
-    return {
-        "success": True,
-        "branch": branch,
-        "priority_topics": enriched_topics
-    }
-
-# -------------------------------
-# STUDY PLAN DOWNLOAD
-# -------------------------------
-@app.get("/study-plan/{branch}")
-def generate_study_plan(branch: str):
-    branch = branch.lower()
-
-    if branch not in analysis_cache:
-        raise HTTPException(status_code=404, detail="No analysis found")
-
-    analysis = analysis_cache[branch]
-    plan = []
-
-    for subject, topics in analysis.items():
-        weak_topics = [t for t, s in topics.items() if s < 50]
-        if weak_topics:
-            plan.append({
-                "subject": subject,
-                "focus_topics": weak_topics
+    for gap in high_priority_gaps:
+        topic_name = gap["gate_topic"]
+        videos = fetch_youtube_videos(topic_name)
+        
+        if videos and "error" not in videos[0]:
+            top_video = videos[0]
+            # Add AI Summary
+            v_id = top_video['url'].split("v=")[-1]
+            top_video['summary'] = get_video_summary(v_id, topic_name, model, util)
+            
+            recommendations.append({
+                "topic": topic_name,
+                "video": top_video
             })
 
-    return JSONResponse(content={
-        "success": True,
-        "branch": branch,
-        "study_plan": plan
-    })
-
-# -------------------------------
-# MARK TOPIC AS DONE
-# -------------------------------
-@app.post("/mark-done")
-def mark_done(data: dict = Body(...)):
-    email = data.get("email")
-    topic = data.get("topic")
-
-    if not email or not topic:
-        raise HTTPException(status_code=400, detail="Missing data")
-
-    if email not in user_progress:
-        user_progress[email] = []
-
-    if topic not in user_progress[email]:
-        user_progress[email].append(topic)
-
-    return {"success": True}
-
-# -------------------------------
-# GET USER PROGRESS
-# -------------------------------
-@app.get("/progress/{email}")
-def get_progress(email: str):
     return {
-        "success": True,
-        "completed_topics": user_progress.get(email, [])
+        "overall_similarity": round(overall_similarity, 1),
+        "critical_gaps": len(high_priority_gaps),
+        "gate_topic_count": len(gate_topics),
+        "results": results,
+        "recommendations": recommendations
     }
 
-# -------------------------------
-# HEALTH CHECK
-# -------------------------------
-@app.get("/healthz")
-def health_check():
-    return {"status": "ok"}
-
-# -------------------------------
-# RUN SERVER
-# -------------------------------
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8000))
+    port = int(os.environ.get("PORT", 7860))
     uvicorn.run(app, host="0.0.0.0", port=port)

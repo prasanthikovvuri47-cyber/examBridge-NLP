@@ -1,6 +1,7 @@
 import os
 import re
 from googleapiclient.discovery import build
+from youtube_transcript_api import YouTubeTranscriptApi
 
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 
@@ -79,3 +80,35 @@ def fetch_youtube_videos(query: str, max_results: int = 5):
     except Exception as e:
         print(f"YouTube Fetch Error: {e}")
         return [{"error": str(e)}]
+
+def get_video_summary(video_id, topic, model, util):
+    """
+    Generates a memory-efficient extractive summary by ranking transcript sentences 
+    relative to the target topic.
+    """
+    try:
+        transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
+        full_text = " ".join([t['text'] for t in transcript_list])
+        
+        # Split into sentences
+        sentences = [s.strip() for s in re.split(r'[.!?]\s+', full_text) if len(s.strip()) > 20]
+        
+        if not sentences:
+            return "Transcript available but no substantial content found for summary."
+
+        # Encode topic and sentences
+        topic_emb = model.encode(topic, convert_to_tensor=True)
+        sentence_embs = model.encode(sentences, convert_to_tensor=True)
+        
+        # Compute similarities
+        similarities = util.cos_sim(topic_emb, sentence_embs)[0]
+        
+        # Get top 3 most relevant sentences
+        top_indices = similarities.argsort(descending=True)[:3]
+        top_sentences = [sentences[idx] for idx in top_indices.tolist()]
+        
+        # Format summary
+        summary = " • " + "\n • ".join(top_sentences)
+        return summary
+    except Exception:
+        return "Summary not available (transcripts might be disabled for this video)."
