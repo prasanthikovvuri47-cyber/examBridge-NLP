@@ -1,8 +1,13 @@
+import os
+from dotenv import load_dotenv
+
+# Load .env FIRST — before any service imports that read os.getenv()
+load_dotenv()
+
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 from backend.services.nlp_service import extract_text_from_pdf, extract_topics, compute_overall_similarity, topic_wise_similarity_ranking, get_model, get_util
 from backend.services.youtube_service import fetch_youtube_videos, get_video_summary
-import os
 import uvicorn
 import logging
 
@@ -11,6 +16,10 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="ExamBridge AI API")
+
+# Persistent storage for Topic of the Day
+current_topic_of_the_day = None
+
 
 # -------------------------------
 # CORS CONFIG - Allow your GitHub Pages site
@@ -103,7 +112,12 @@ async def analyze(branch: str, file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"AI analysis failed: {str(e)}")
 
     # 4. Get Enriched Recommendations (Gaps + Summaries)
-    high_priority_gaps = [r for r in results if "High" in r["priority"]][:8]
+    high_priority_gaps = []
+    for r in results:
+        if "High" in r.get("priority", ""):
+            high_priority_gaps.append(r)
+            if len(high_priority_gaps) >= 8:
+                break
     recommendations = []
     youtube_links = []
     
@@ -137,6 +151,34 @@ async def analyze(branch: str, file: UploadFile = File(...)):
 
     comparison_summary = f"Your syllabus has an overall match of {round(overall_similarity, 1)}% with the GATE {branch} syllabus. We identified {len(high_priority_gaps)} critical gaps where topics are either missing or have low similarity."
 
+    logger.info("Generating Topic of the Day...")
+    topic_of_the_day = None
+    global current_topic_of_the_day
+    if results:
+        # Pick highest priority topic not mastered
+        highest_priority_gap = next((r for r in results if "High" in r.get("priority", "")), None)
+        if not highest_priority_gap:
+            highest_priority_gap = next((r for r in results if "Medium" in r.get("priority", "")), None)
+        if not highest_priority_gap:
+            highest_priority_gap = results[0]
+            
+        selected_topic_name = highest_priority_gap["gate_topic"]
+        
+        # Explain
+        priority_label = highest_priority_gap.get("priority", "Low").replace("🚨 ", "").replace("🟡 ", "").replace("✅ ", "")
+        explanation = f"This topic is selected today because it is a {priority_label}-priority concept with significant weightage in GATE Operating Systems. It is a critical link in your syllabus coverage."
+        
+        # Store persistently in memory
+        current_topic_of_the_day = {
+            "topic_name": selected_topic_name,
+            "explanation": explanation
+        }
+        
+        topic_of_the_day = {
+            "Topic Name": selected_topic_name,
+            "Explanation": explanation
+        }
+
     logger.info("Analysis complete. Returning response.")
     
     # Return structured JSON as requested
@@ -148,7 +190,47 @@ async def analyze(branch: str, file: UploadFile = File(...)):
         "critical_gaps": len(high_priority_gaps),
         "gate_topic_count": len(gate_topics),
         "results": results,
-        "recommendations": recommendations
+        "recommendations": recommendations,
+        "topic_of_the_day": topic_of_the_day
+    }
+
+@app.get("/topic-of-the-day")
+async def get_tod():
+    """
+    Returns the persistent Topic of the Day with a fresh live YouTube search.
+    """
+    global current_topic_of_the_day
+    if not current_topic_of_the_day:
+        raise HTTPException(status_code=404, detail="No syllabus has been analyzed yet to generate a Topic of the Day.")
+    
+    topic_name = current_topic_of_the_day["topic_name"]
+    explanation = current_topic_of_the_day["explanation"]
+    
+    # 3. Fetch YouTube videos (Dynamic ranking every time)
+    logger.info(f"Fetching fresh YouTube recommendation for TOD: {topic_name}")
+    videos = fetch_youtube_videos(f"{topic_name} Operating Systems GATE", max_results=1)
+    
+    best_video = None
+    if videos and isinstance(videos[0], dict) and "error" not in videos[0]:
+        v = videos[0]
+        raw_views = v.get("views", 0)
+        raw_likes = v.get("likes", 0)
+        # Format for human-readable display
+        views_str = f"{raw_views:,}" if raw_views > 0 else "N/A"
+        likes_str = f"{raw_likes:,}" if raw_likes > 0 else "N/A"
+        best_video = {
+            "Title": v.get("title", "N/A"),
+            "Channel": v.get("channel", "N/A"),
+            "Views": views_str,
+            "Likes": likes_str,
+            "Link": v.get("url", "#"),
+            "Thumbnail": v.get("thumbnail", "")
+        }
+    
+    return {
+        "Topic": topic_name,
+        "Explanation": explanation,
+        "Best Video": best_video
     }
 
 if __name__ == "__main__":

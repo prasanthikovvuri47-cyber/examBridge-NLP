@@ -11,11 +11,13 @@ logger = logging.getLogger(__name__)
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 
 def get_youtube_client():
-    if not YOUTUBE_API_KEY:
+    # Read key dynamically every time to support load_dotenv() and env var changes
+    api_key = os.getenv("YOUTUBE_API_KEY") or YOUTUBE_API_KEY
+    if not api_key:
         logger.error("YOUTUBE_API_KEY is not set in environment variables.")
         return None
     try:
-        client = build("youtube", "v3", developerKey=YOUTUBE_API_KEY)
+        client = build("youtube", "v3", developerKey=api_key)
         logger.info("YouTube API client initialized successfully.")
         return client
     except Exception as e:
@@ -70,27 +72,46 @@ def fetch_youtube_videos(query: str, max_results: int = 5):
         ).execute()
 
         scored_videos = []
+        TRUSTED_CHANNELS = [
+            "gate smashers", "neso academy", "knowledge gate",
+            "unacademy gate", "simply learn", "ravindrababu ravula",
+            "last moment tuitions", "geeks for geeks"
+        ]
         for item in videos_data.get('items', []):
             duration_sec = parse_duration(item['contentDetails'].get('duration', ''))
             if duration_sec < 300: continue # Skip shorts/very short videos
 
             views = int(item['statistics'].get('viewCount', 0))
             likes = int(item['statistics'].get('likeCount', 0))
+            channel_name = item['snippet']['channelTitle']
+            
+            # Primary score: views + weighted likes
             score = views + (likes * 50)
+
+            # Apply 1.5x boost for trusted educational channels
+            if any(tc in channel_name.lower() for tc in TRUSTED_CHANNELS):
+                score = int(score * 1.5)
+                logger.info(f"Trusted channel boost applied to: {channel_name}")
 
             scored_videos.append({
                 "title": item['snippet']['title'],
-                "channel": item['snippet']['channelTitle'],
+                "channel": channel_name,
                 "url": f"https://www.youtube.com/watch?v={item['id']}",
                 "thumbnail": item['snippet']['thumbnails']['high']['url'],
                 "duration": item['contentDetails']['duration'].replace('PT', '').lower(),
-                "score": score
+                "score": score,
+                "views": views,
+                "likes": likes
             })
 
         # Sort by score and return top results
         scored_videos.sort(key=lambda x: x['score'], reverse=True)
-        logger.info(f"Successfully fetched and scored {len(scored_videos)} videos.")
-        return scored_videos[:max_results]
+        final_results = []
+        for i in range(min(len(scored_videos), max_results)):
+            final_results.append(scored_videos[i])
+            
+        logger.info(f"Successfully fetched and scored {len(final_results)} videos.")
+        return final_results
 
     except Exception as e:
         logger.error(f"YouTube Fetch Error: {e}")
