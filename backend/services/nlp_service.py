@@ -1,7 +1,11 @@
 import pdfplumber
 import io
 import re
-from functools import lru_cache
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Lazy load heavy modules to prevent startup issues
 _model = None
@@ -9,13 +13,23 @@ _model = None
 def get_model():
     global _model
     if _model is None:
-        from sentence_transformers import SentenceTransformer
-        _model = SentenceTransformer('all-MiniLM-L6-v2')
+        try:
+            from sentence_transformers import SentenceTransformer
+            logger.info("Loading SentenceTransformer model 'all-MiniLM-L6-v2'...")
+            _model = SentenceTransformer('all-MiniLM-L6-v2')
+            logger.info("Model loaded successfully.")
+        except Exception as e:
+            logger.error(f"Failed to load model: {e}")
+            raise RuntimeError(f"Model loading failed: {e}")
     return _model
 
 def get_util():
-    from sentence_transformers import util
-    return util
+    try:
+        from sentence_transformers import util
+        return util
+    except Exception as e:
+        logger.error(f"Failed to load sentence_transformers.util: {e}")
+        raise RuntimeError(f"Utility loading failed: {e}")
 
 def extract_text_from_pdf(contents: bytes) -> str:
     text = ""
@@ -26,7 +40,8 @@ def extract_text_from_pdf(contents: bytes) -> str:
                 if extracted:
                     text += extracted + " "
     except Exception as e:
-        print(f"Error extracting PDF: {e}")
+        logger.error(f"Error extracting PDF: {e}")
+        raise ValueError(f"PDF extraction failed: {e}")
     return text
 
 def extract_topics(text):
@@ -40,16 +55,21 @@ def extract_topics(text):
     return list(dict.fromkeys(topics))
 
 def compute_overall_similarity(text1, text2):
+    logger.info("Computing overall similarity...")
     model = get_model()
     util = get_util()
     embeddings = model.encode([text1, text2])
     similarity = util.cos_sim(embeddings[0], embeddings[1])
-    return float(similarity[0][0]) * 100
+    score = float(similarity[0][0]) * 100
+    logger.info(f"Overall similarity computed: {score:.2f}%")
+    return score
 
 def topic_wise_similarity_ranking(college_topics, gate_topics):
     if not college_topics or not gate_topics:
+        logger.warning("Empty topics provided for comparison.")
         return []
         
+    logger.info(f"Starting topic-wise comparison (GATE topics: {len(gate_topics)}, College topics: {len(college_topics)})")
     model = get_model()
     util = get_util()
     
@@ -84,4 +104,5 @@ def topic_wise_similarity_ranking(college_topics, gate_topics):
         
     # Sort by priority and then similarity (Critical gaps first)
     results.sort(key=lambda x: (x["priority"] != "🚨 High", x["priority"] != "🟡 Medium", x["similarity"]))
+    logger.info("Topic-wise comparison completed.")
     return results

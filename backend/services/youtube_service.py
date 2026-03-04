@@ -1,17 +1,25 @@
 import os
 import re
+import logging
 from googleapiclient.discovery import build
 from youtube_transcript_api import YouTubeTranscriptApi
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 
 def get_youtube_client():
     if not YOUTUBE_API_KEY:
+        logger.error("YOUTUBE_API_KEY is not set in environment variables.")
         return None
     try:
-        return build("youtube", "v3", developerKey=YOUTUBE_API_KEY)
+        client = build("youtube", "v3", developerKey=YOUTUBE_API_KEY)
+        logger.info("YouTube API client initialized successfully.")
+        return client
     except Exception as e:
-        print(f"YouTube API Error: {e}")
+        logger.error(f"Failed to initialize YouTube API client: {e}")
         return None
 
 def parse_duration(duration_str):
@@ -24,12 +32,15 @@ def parse_duration(duration_str):
     return hours * 3600 + minutes * 60 + seconds
 
 def fetch_youtube_videos(query: str, max_results: int = 5):
+    logger.info(f"Fetching YouTube videos for query: {query}")
     youtube = get_youtube_client()
     if youtube is None:
+        logger.warning("YouTube client not available. Returning error information.")
         return [{"error": "YouTube API key not configured or invalid"}]
 
     try:
         # Search for long-form lectures
+        logger.info(f"Searching for long-form lectures for: {query}")
         search = youtube.search().list(
             q=f"{query} technical lecture",
             part="snippet", type="video", videoDuration="long",
@@ -40,6 +51,7 @@ def fetch_youtube_videos(query: str, max_results: int = 5):
         
         if not video_ids:
             # Fallback to medium duration if no long ones found
+            logger.info(f"No long-form videos found for '{query}', falling back to medium duration.")
             search = youtube.search().list(
                 q=query, part="snippet", type="video", videoDuration="medium",
                 order="viewCount", maxResults=max_results
@@ -47,9 +59,11 @@ def fetch_youtube_videos(query: str, max_results: int = 5):
             video_ids = [item['id']['videoId'] for item in search.get('items', [])]
 
         if not video_ids:
+            logger.info(f"No videos found for topic: {query}")
             return []
 
         # Get statistics for scoring
+        logger.info(f"Fetching details for {len(video_ids)} videos...")
         videos_data = youtube.videos().list(
             part="statistics,contentDetails,snippet",
             id=",".join(video_ids)
@@ -75,10 +89,11 @@ def fetch_youtube_videos(query: str, max_results: int = 5):
 
         # Sort by score and return top results
         scored_videos.sort(key=lambda x: x['score'], reverse=True)
+        logger.info(f"Successfully fetched and scored {len(scored_videos)} videos.")
         return scored_videos[:max_results]
 
     except Exception as e:
-        print(f"YouTube Fetch Error: {e}")
+        logger.error(f"YouTube Fetch Error: {e}")
         return [{"error": str(e)}]
 
 def get_video_summary(video_id, topic, model, util):
@@ -86,6 +101,7 @@ def get_video_summary(video_id, topic, model, util):
     Generates a memory-efficient extractive summary by ranking transcript sentences 
     relative to the target topic.
     """
+    logger.info(f"Generating summary for video ID: {video_id} (Topic: {topic})")
     try:
         transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
         full_text = " ".join([t['text'] for t in transcript_list])
@@ -94,6 +110,7 @@ def get_video_summary(video_id, topic, model, util):
         sentences = [s.strip() for s in re.split(r'[.!?]\s+', full_text) if len(s.strip()) > 20]
         
         if not sentences:
+            logger.warning(f"No substantial content found in transcript for video {video_id}")
             return "Transcript available but no substantial content found for summary."
 
         # Encode topic and sentences
@@ -109,6 +126,8 @@ def get_video_summary(video_id, topic, model, util):
         
         # Format summary
         summary = " • " + "\n • ".join(top_sentences)
+        logger.info(f"Summary generated successfully for video {video_id}")
         return summary
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Summary generation failed for video {video_id}: {e}")
         return "Summary not available (transcripts might be disabled for this video)."

@@ -3,6 +3,7 @@ import re
 import tempfile
 import requests
 import pdfplumber
+import logging
 from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -11,26 +12,37 @@ from sentence_transformers import SentenceTransformer, util
 from googleapiclient.discovery import build
 import numpy as np
 
-app = FastAPI()
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+app = FastAPI(title="ExamBridge AI API")
 
 # ===============================
 # CONFIGURATION
 # ===============================
 PDF_FOLDER = "gate_pdfs"
-YOUTUBE_API_KEY = "AIzaSyAsJzyUy_IaAglkSUBYVXZUjxH1ehLG8b0"
-youtube = None
-try:
-    youtube = build('youtube', 'v3', developerKey=YOUTUBE_API_KEY)
-except Exception as e:
-    print(f"YouTube API Error: {e}")
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
+
+def get_youtube_client():
+    if not YOUTUBE_API_KEY:
+        logger.error("YOUTUBE_API_KEY is not set.")
+        return None
+    try:
+        return build('youtube', 'v3', developerKey=YOUTUBE_API_KEY)
+    except Exception as e:
+        logger.error(f"YouTube API Error: {e}")
+        return None
 
 # Load Semantic Model
+logger.info("Loading NLP model...")
 model = SentenceTransformer('all-MiniLM-L6-v2')
+logger.info("Model loaded.")
 
 templates = Jinja2Templates(directory="templates")
 
 # ===============================
-# UTILITY FUNCTIONS (Migrated from app.py)
+# UTILITY FUNCTIONS
 # ===============================
 
 def extract_pdf_text(file_path):
@@ -42,7 +54,8 @@ def extract_pdf_text(file_path):
                 if content:
                     text += content + "\n"
     except Exception as e:
-        print(f"Error extracting PDF: {e}")
+        logger.error(f"Error extracting PDF: {e}")
+        raise ValueError(f"PDF extraction failed: {e}")
     return text
 
 def extract_topics(text):
@@ -85,56 +98,22 @@ def topic_wise_similarity(college_topics, gate_topics):
     results.sort(key=lambda x: (x["priority"] != "🚨 High", x["priority"] != "🟡 Medium", x["similarity"]))
     return results
 
-def parse_duration(duration_str):
-    if not duration_str: return 0
-    match = re.match(r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?', duration_str)
-    if not match: return 0
-    hours = int(match.group(1)) if match.group(1) else 0
-    minutes = int(match.group(2)) if match.group(2) else 0
-    seconds = int(match.group(3)) if match.group(3) else 0
-    return hours * 3600 + minutes * 60 + seconds
-
 def get_best_video_link(topic):
+    youtube = get_youtube_client()
     if not youtube: return None
     try:
         search = youtube.search().list(
             q=f"GATE {topic} lecture technical full",
             part="snippet", type="video", videoDuration="long", 
-            order="viewCount", maxResults=10
+            order="viewCount", maxResults=5
         ).execute()
-        video_ids = [item['id']['videoId'] for item in search['items']]
-        if not video_ids:
-            search = youtube.search().list(
-                q=f"GATE {topic} lecture technical",
-                part="snippet", type="video", videoDuration="medium",
-                order="viewCount", maxResults=10
-            ).execute()
-            video_ids = [item['id']['videoId'] for item in search['items']]
-        if not video_ids: return None
-        videos_data = youtube.videos().list(
-            part="statistics,contentDetails,snippet",
-            id=",".join(video_ids)
-        ).execute()
-        best_video = None
-        best_score = -1
-        for item in videos_data['items']:
-            duration_sec = parse_duration(item['contentDetails'].get('duration', ''))
-            if duration_sec < 300: continue
-            views = int(item['statistics'].get('viewCount', 0))
-            likes = int(item['statistics'].get('likeCount', 0))
-            score = views + (likes * 50) 
-            if score > best_score:
-                best_score = score
-                best_video = {
-                    "url": f"https://www.youtube.com/watch?v={item['id']}",
-                    "title": item['snippet']['title'],
-                    "thumbnail": item['snippet']['thumbnails']['high']['url'],
-                    "duration": item['contentDetails']['duration'].replace('PT', '').lower(),
-                    "channel": item['snippet']['channelTitle']
-                }
-        return best_video
+        items = search.get('items', [])
+        if not items:
+            return None
+        video_id = items[0]['id']['videoId']
+        return f"https://www.youtube.com/watch?v={video_id}"
     except Exception as e:
-        print(f"Error fetching YouTube: {e}")
+        logger.error(f"Error fetching YouTube: {e}")
         return None
 
 # ===============================
@@ -148,6 +127,10 @@ async def index(request: Request):
         branches = [f.replace(".pdf", "") for f in os.listdir(PDF_FOLDER) if f.endswith(".pdf")]
     return templates.TemplateResponse("index.html", {"request": request, "branches": branches})
 
+@app.get("/health")
+def health_check():
+    return {"status": "running"}
+
 @app.post("/analyze")
 async def analyze(
     request: Request,
@@ -157,6 +140,7 @@ async def analyze(
     pasted_text: str = Form(None),
     syllabus_url: str = Form(None)
 ):
+    logger.info(f"Analysis request received for branch: {selected_branch}")
     college_text = ""
     # Handle PDF Upload
     if syllabus_type == "Upload PDF" and college_pdf:
@@ -176,8 +160,8 @@ async def analyze(
                 tmp.write(response.content)
                 college_text = extract_pdf_text(tmp.name)
             os.remove(tmp.name)
-        except:
-            raise HTTPException(status_code=400, detail="Invalid PDF URL")
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid PDF URL: {str(e)}")
 
     if not college_text:
         raise HTTPException(status_code=400, detail="No syllabus content found")
@@ -195,22 +179,25 @@ async def analyze(
     gate_topics = extract_topics(gate_text)
     results = topic_wise_similarity(college_topics, gate_topics)
 
-    # Get video recommendations for top gaps
+    # Get video links for top gaps
     high_priority_gaps = [r for r in results if "High" in r["priority"]][:8]
-    recommendations = []
+    youtube_links = []
     for gap in high_priority_gaps:
-        video = get_best_video_link(gap["gate_topic"])
-        if video:
-            recommendations.append({"topic": gap["gate_topic"], "video": video})
+        link = get_best_video_link(gap["gate_topic"])
+        if link:
+            youtube_links.append(link)
+
+    comparison_summary = f"Match: {round(overall_similarity, 1)}%. Gaps: {len(high_priority_gaps)}."
 
     return {
+        "comparison_result": comparison_summary,
+        "youtube_links": youtube_links,
         "overall_similarity": round(overall_similarity, 1),
         "results": results,
-        "recommendations": recommendations,
         "gate_topic_count": len(gate_topics),
         "critical_gaps": len(high_priority_gaps)
     }
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=7860)
