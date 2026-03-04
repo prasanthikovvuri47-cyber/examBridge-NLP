@@ -19,6 +19,7 @@ origins = [
     "https://pothulaannapurna8.github.io",
     "https://exam-bridge-nexus.onrender.com",
     "http://localhost:3000",
+    "http://localhost:5173", # Vite dev server
     "http://127.0.0.1:5500",
     "*" # Allowed for debugging, narrow down in production
 ]
@@ -30,6 +31,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Register Auth Router
+from backend.routes.auth import router as auth_router
+app.include_router(auth_router, prefix="/auth")
 
 PDF_FOLDER = "gate_pdfs"
 
